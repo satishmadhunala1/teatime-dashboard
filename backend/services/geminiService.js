@@ -5,7 +5,7 @@ require("dotenv").config()
 
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const GEMINI_API_KEY="AIzaSyCEyJ8WdqlxsqXk_1dHdkwncNTMA58qqoQ"
+const GEMINI_API_KEY="AIzaSyBroZjJ2d3iwa2-2viJWn59Ly4B-w0_G_Y"
 
 class GeminiService {
   constructor() {
