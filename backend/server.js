@@ -7,7 +7,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin:"http://localhost:5173"
+  origin:"https://teatimedashboardai.vercel.app"
 }));
 app.use(express.json({ limit: '10mb' }));
 
