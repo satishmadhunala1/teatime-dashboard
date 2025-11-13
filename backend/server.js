@@ -1,30 +1,40 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
 
 // Middleware
 app.use(cors({
-    origin:"https://teatimedashboardai.vercel.app"
+  origin:"http://localhost:5173"
 }));
 app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/news', require('./routes/news'));
 
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running', timestamp: new Date() });
+  res.json({ 
+    status: 'Server is running', 
+    timestamp: new Date(),
+    service: 'Bilingual News Auto-Fetcher'
+  });
 });
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bilingual-news')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => {
+    console.log('✅ Connected to MongoDB');
+    
+ 
+    
+  })
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

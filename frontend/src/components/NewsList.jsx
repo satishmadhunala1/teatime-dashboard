@@ -43,6 +43,7 @@ const NewsList = () => {
                 {/* English Version */}
                 <div className="md:border-r md:border-gray-200 md:pr-6">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3">{article.englishTitle}</h2>
+                  <img src={article.imageUrl} alt="" />
                   <p className="text-gray-600 whitespace-pre-line mb-4 text-sm sm:text-base">{article.englishContent}</p>
                   {article.englishTags.length > 0 && (
                     <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -58,6 +59,7 @@ const NewsList = () => {
                 {/* Telugu Version */}
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3">{article.teluguTitle}</h2>
+                  <img src={article.imageUrl} alt="" />
                   <p className="text-gray-600 whitespace-pre-line mb-4 text-sm sm:text-base">{article.teluguContent}</p>
                   {article.teluguTags.length > 0 && (
                     <div className="flex flex-wrap gap-1 sm:gap-2">
