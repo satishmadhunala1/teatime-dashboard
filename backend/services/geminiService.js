@@ -4,26 +4,47 @@ const GEMINI_API_KEY = "AIzaSyBroZjJ2d3iwa2-2viJWn59Ly4B-w0_G_Y"
 class GeminiService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('AIzaSyB')) {  // Detect placeholder
+      this.log('warn', 'API key looks invalid/placeholder - translations will fail');
+    }
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    this.log('info', 'GeminiService initialized', { model: 'gemini-2.5-flash', keyPrefix: GEMINI_API_KEY?.substring(0, 10) + '...' });
+  }
+
+  log(level, message, extra = {}) {
+    const timestamp = new Date().toISOString();
+    console[level](`[${timestamp}] GeminiService ${level.toUpperCase()}: ${message}`, extra);
   }
 
   // Add retry mechanism with exponential backoff
   async makeRequestWithRetry(prompt, maxRetries = 3, baseDelay = 1000) {
+    const promptLength = prompt.length;
+    this.log('info', 'Starting API request', { promptLength, maxRetries });
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        this.log('info', `API attempt ${attempt}/${maxRetries}`);
         const result = await this.model.generateContent(prompt);
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+        this.log('info', 'API success', { responseLength: text.length, attempt });
+        return text;
       } catch (error) {
-        console.error(`Gemini API Attempt ${attempt} failed:`, error.message);
+        this.log('error', `API attempt ${attempt} failed`, { 
+          message: error.message, 
+          status: error.status || 'N/A', 
+          code: error.code || 'N/A', 
+          promptLength 
+        });
         
         if (attempt === maxRetries) {
+          this.log('error', 'All retries exhausted - throwing error');
           throw error;
         }
         
         // Exponential backoff: wait longer after each attempt
         const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.log(`Retrying in ${delay}ms...`);
+        this.log('info', `Retrying in ${delay}ms...`, { attempt });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -33,12 +54,14 @@ class GeminiService {
     try {
       return await this.makeRequestWithRetry(prompt);
     } catch (error) {
-      console.error('Gemini API Error after retries:', error);
+      this.log('error', 'Gemini API Error after retries', { error: error.message });
       throw new Error('Gemini API call failed: ' + error.message);
     }
   }
 
   async translateAndCorrect({ title, content, tags = [] }) {
+    this.log('info', 'Starting translation', { titleLength: title.length, contentLength: content.length, tags: tags.length });
+    
     const prompt = `
 CRITICAL MISSION: You are a Telugu Linguistics Professor with 30 years of experience in translation and journalism. Your translation must be ABSOLUTELY PERFECT without a single error.
 
@@ -111,23 +134,31 @@ Before submitting, perform these 5 verification checks one final time. Every cha
 IMPORTANT: Return ONLY the JSON object. No additional text, no explanations, no apologies.
 `;
 
+    this.log('info', 'Prompt generated', { promptLength: prompt.length });
+    
     try {
       const text = await this.makeRequestWithRetry(prompt);
+      this.log('info', 'Raw API response received', { responsePreview: text.substring(0, 200) + '...' });
       
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        
-        // Additional client-side validation
-        this.validateTeluguTranslation(result);
-        
-        return result;
-      } else {
+      if (!jsonMatch) {
+        this.log('error', 'No JSON found in response', { fullTextLength: text.length, responsePreview: text });
         throw new Error('Invalid JSON response format from Gemini API');
       }
+      
+      const result = JSON.parse(jsonMatch[0]);
+      this.log('info', 'JSON parsed successfully', { hasTeluguTitle: !!result.teluguTitle, hasTeluguContent: !!result.teluguContent });
+      
+      // Additional client-side validation
+      this.validateTeluguTranslation(result);
+      
+      this.log('info', 'Translation complete', { teluguLength: result.teluguContent?.length });
+      return result;
     } catch (error) {
-      console.error('Translation failed after retries:', error);
-      return this.getFallbackTranslation(title, content, tags);
+      this.log('error', 'Translation failed after retries', { error: error.message });
+      const fallback = this.getFallbackTranslation(title, content, tags);
+      this.log('info', 'Using fallback translation');
+      return fallback;
     }
   }
 
@@ -138,30 +169,32 @@ IMPORTANT: Return ONLY the JSON object. No additional text, no explanations, no 
     // Basic Telugu script validation
     const teluguRegex = /[\u0C00-\u0C7F]/;
     
-    if (!teluguRegex.test(teluguTitle)) {
-      console.warn('Warning: Telugu title may contain non-Telugu characters');
+    if (!teluguRegex.test(teluguTitle || '')) {
+      this.log('warn', 'Telugu title lacks Telugu script - possible incomplete translation');
     }
     
-    if (!teluguRegex.test(teluguContent)) {
-      console.warn('Warning: Telugu content may contain non-Telugu characters');
+    if (!teluguRegex.test(teluguContent || '')) {
+      this.log('warn', 'Telugu content lacks Telugu script - possible incomplete translation');
     }
     
     // Check for common Telugu errors
-    this.checkCommonErrors(teluguTitle, 'Title');
-    this.checkCommonErrors(teluguContent, 'Content');
+    this.checkCommonErrors(teluguTitle || '', 'Title');
+    this.checkCommonErrors(teluguContent || '', 'Content');
+    this.checkCommonErrors((teluguTags || []).join(' '), 'Tags');
   }
 
   // Check for common Telugu translation errors
   checkCommonErrors(text, field) {
     const commonErrors = [
       { pattern: /[a-zA-Z]/, message: 'English characters in Telugu text' },
-      { pattern: /\?\?\?/, message: 'Untranslated sections' },
-      { pattern: /\[.*\]/, message: 'Bracketed notes in translation' }
+      { pattern: /\?\?\?/, message: 'Untranslated sections (??? placeholders)' },
+      { pattern: /\[.*\]/, message: 'Bracketed notes/unfinished parts' },
+      { pattern: /fallback/i, message: 'Fallback text detected in output' }  // New: Detect if API sneaked in fallback
     ];
     
     commonErrors.forEach(({ pattern, message }) => {
       if (pattern.test(text)) {
-        console.warn(`Quality Check - ${field}: Possible ${message}`);
+        this.log('warn', `Quality issue in ${field}: ${message}`, { sample: text.substring(0, 50) });
       }
     });
   }
@@ -177,7 +210,8 @@ IMPORTANT: Return ONLY the JSON object. No additional text, no explanations, no 
   }
 
   getFallbackTranslation(title, content, tags) {
-    return {
+    this.log('warn', 'Fallback activated - API unavailable or failed');
+    const result = {
       teluguTitle: this.fallbackTranslation(title),
       teluguContent: this.fallbackTranslation(content),
       englishTags: tags.length ? tags.slice(0, 3) : this.generateFallbackTags(title),
@@ -185,9 +219,13 @@ IMPORTANT: Return ONLY the JSON object. No additional text, no explanations, no 
       _fallback: true,
       _message: "Translation service temporarily unavailable. Using fallback."
     };
+    this.log('info', 'Fallback result prepared');
+    return result;
   }
 
   async translateNewsArticle(newsData) {
+    this.log('info', 'Starting news article translation', { titleLength: newsData.title.length, contentLength: newsData.content.length });
+    
     const prompt = `
 You are a Telugu journalism expert. Translate this news article with absolute perfection.
 
@@ -208,19 +246,27 @@ OUTPUT FORMAT (JSON only):
 }
 `;
 
+    this.log('info', 'Prompt generated for news article', { promptLength: prompt.length });
+    
     try {
       const text = await this.makeRequestWithRetry(prompt);
+      this.log('info', 'Raw API response for news received', { responsePreview: text.substring(0, 200) + '...' });
+      
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        this.validateTeluguTranslation(result);
-        return result;
-      } else {
+      if (!jsonMatch) {
+        this.log('error', 'No JSON found in news response', { fullTextLength: text.length, responsePreview: text });
         throw new Error('Invalid response format from Gemini API');
       }
+      
+      const result = JSON.parse(jsonMatch[0]);
+      this.log('info', 'News JSON parsed successfully', { hasTeluguTitle: !!result.teluguTitle, hasTeluguContent: !!result.teluguContent });
+      
+      this.validateTeluguTranslation(result);
+      this.log('info', 'News translation complete', { teluguLength: result.teluguContent?.length });
+      return result;
     } catch (error) {
-      console.error('Gemini API Error:', error);
+      this.log('error', 'News translation failed', { error: error.message });
       return this.getFallbackTranslation(
         newsData.title, 
         newsData.content, 
@@ -231,6 +277,8 @@ OUTPUT FORMAT (JSON only):
 
   // Additional method for quality-focused tag generation
   async generatePerfectTags({ englishTitle, englishContent }) {
+    this.log('info', 'Starting tag generation', { titleLength: englishTitle.length, contentLength: englishContent.length });
+    
     const prompt = `
 Generate highly specific and relevant tags for this news content.
 
@@ -248,20 +296,27 @@ OUTPUT FORMAT (JSON only):
 }
 `;
 
+    this.log('info', 'Tag prompt generated', { promptLength: prompt.length });
+    
     try {
       const text = await this.makeRequestWithRetry(prompt);
+      this.log('info', 'Raw tag response received', { responsePreview: text.substring(0, 200) + '...' });
+      
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const result = JSON.parse(jsonMatch[0]);
+        this.log('info', 'Tags parsed successfully', { englishTagCount: result.englishTags?.length, teluguTagCount: result.teluguTags?.length });
+        return result;
       } else {
+        this.log('error', 'No JSON in tag response', { fullTextLength: text.length });
         return {
           englishTags: this.generateFallbackTags(englishTitle),
           teluguTags: ["సమాచారం", "వార్త", "అప్డేట్"]
         };
       }
     } catch (error) {
-      console.error('Tag generation error:', error);
+      this.log('error', 'Tag generation error', { error: error.message });
       return {
         englishTags: this.generateFallbackTags(englishTitle),
         teluguTags: ["సమాచారం", "వార్త", "అప్డేట్"]
