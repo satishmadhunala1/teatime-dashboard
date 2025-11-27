@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import AdminDashboard from './components/AdminDashboard';
 import NewsList from './components/NewsList';
 import './App.css';
+import UnderMaintenance from './components/UnderMaintenance';
 
 
 function App() {
@@ -27,7 +28,7 @@ function App() {
 
         <Routes>
           <Route path="/" element={<AdminDashboard />} />
-          <Route path="/news" element={<NewsList />} />
+          
         
 
         </Routes>
