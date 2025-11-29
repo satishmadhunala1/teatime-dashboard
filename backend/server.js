@@ -1,42 +1,46 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
 
 const app = express();
 
-// Middleware
+/* ---------------------------------------
+   SIMPLE & WORKING CORS SETUP (NO .env)
+   ---------------------------------------
+   Step 1 (before frontend deploy):
+        allow all = "*"
+
+   Step 2 (after frontend deploy):
+        change "*" → your Vercel URL
+------------------------------------------ */
+
 app.use(cors({
-  origin:"https://teatimedashboardai.vercel.app"
+  origin: "*",   // CHANGE THIS LATER to your Vercel URL
 }));
+
+// Body parser
 app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/news', require('./routes/news'));
 
-
 app.get('/', (req, res) => {
   res.send('Welcome to the Bilingual News Auto-Fetcher API');
 });
 
-
-
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'Server is running', 
+  res.json({
+    status: 'Server is running',
     timestamp: new Date(),
     service: 'Bilingual News Auto-Fetcher'
   });
 });
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bilingual-news')
+// DB connection
+mongoose.connect('mongodb://localhost:27017/bilingual-news')
   .then(() => {
     console.log('✅ Connected to MongoDB');
-    
- 
-    
   })
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
