@@ -13,10 +13,11 @@ const app = express();
    Step 2 (after frontend deploy):
         change "*" → your Vercel URL
 ------------------------------------------ */
-
 app.use(cors({
-  origin: "*",   // CHANGE THIS LATER to your Vercel URL
+  origin: "https://teatime-dashboard.vercel.app",
+  credentials: true
 }));
+
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
