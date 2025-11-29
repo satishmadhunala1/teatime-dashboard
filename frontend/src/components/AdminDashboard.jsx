@@ -284,7 +284,40 @@ const MusicPlayer = () => {
   );
 };
 
+// Translation Toggle Component
+const TranslationToggle = ({ isTeluguToEnglish, onToggle }) => {
+  return (
+    <div className="flex items-center justify-center mb-6">
+      <div className="bg-white border border-gray-300 rounded-lg p-1 flex">
+        <button
+          type="button"
+          onClick={() => onToggle(false)}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            !isTeluguToEnglish
+              ? 'bg-blue-500 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          English → Telugu
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggle(true)}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            isTeluguToEnglish
+              ? 'bg-green-500 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Telugu → English
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
+  const [isTeluguToEnglish, setIsTeluguToEnglish] = useState(false);
   const [formData, setFormData] = useState({
     englishTitle: "",
     englishContent: "",
@@ -295,48 +328,60 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState({
     autoTranslate: false,
-    generateEnglishTags: false,
+    generateSourceTags: false,
     submit: false,
   });
   const [preview, setPreview] = useState(null);
   const [message, setMessage] = useState("");
 
-  // Auto-generate English tags when content is substantial
+  // Auto-generate source tags when content is substantial
   useEffect(() => {
-    const generateEnglishTags = async () => {
+    const generateSourceTags = async () => {
+      const sourceTitle = isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle;
+      const sourceContent = isTeluguToEnglish ? formData.teluguContent : formData.englishContent;
+      const sourceTags = isTeluguToEnglish ? formData.teluguTags : formData.englishTags;
+
       if (
-        formData.englishTitle.length > 10 &&
-        formData.englishContent.length > 50 &&
-        formData.englishTags.length === 0
+        sourceTitle.length > 10 &&
+        sourceContent.length > 50 &&
+        sourceTags.length === 0
       ) {
-        setLoading((prev) => ({ ...prev, generateEnglishTags: true }));
+        setLoading((prev) => ({ ...prev, generateSourceTags: true }));
         try {
-          const response = await newsAPI.generateEnglishTags({
-            englishTitle: formData.englishTitle,
-            englishContent: formData.englishContent,
+          const endpoint = isTeluguToEnglish 
+            ? newsAPI.generateTeluguTags 
+            : newsAPI.generateEnglishTags;
+
+          const response = await endpoint({
+            [isTeluguToEnglish ? 'teluguTitle' : 'englishTitle']: sourceTitle,
+            [isTeluguToEnglish ? 'teluguContent' : 'englishContent']: sourceContent,
           });
 
-          if (
-            response.data.englishTags &&
-            response.data.englishTags.length > 0
-          ) {
+          if (response.data[isTeluguToEnglish ? 'teluguTags' : 'englishTags']?.length > 0) {
             setFormData((prev) => ({
               ...prev,
-              englishTags: response.data.englishTags,
+              [isTeluguToEnglish ? 'teluguTags' : 'englishTags']: 
+                response.data[isTeluguToEnglish ? 'teluguTags' : 'englishTags'],
             }));
-            setMessage("English tags auto-generated from your content!");
+            setMessage(`${isTeluguToEnglish ? 'Telugu' : 'English'} tags auto-generated from your content!`);
           }
         } catch (error) {
           console.log("Auto-tag generation failed:", error.message);
         } finally {
-          setLoading((prev) => ({ ...prev, generateEnglishTags: false }));
+          setLoading((prev) => ({ ...prev, generateSourceTags: false }));
         }
       }
     };
 
-    const timeoutId = setTimeout(generateEnglishTags, 2000);
+    const timeoutId = setTimeout(generateSourceTags, 2000);
     return () => clearTimeout(timeoutId);
-  }, [formData.englishTitle, formData.englishContent]);
+  }, [
+    formData.englishTitle, 
+    formData.englishContent, 
+    formData.teluguTitle, 
+    formData.teluguContent, 
+    isTeluguToEnglish
+  ]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -374,44 +419,57 @@ const AdminDashboard = () => {
     }));
   };
 
-  const handleGenerateEnglishTags = async () => {
-    if (!formData.englishTitle && !formData.englishContent) {
-      setMessage("Please enter English title or content first");
+  const handleGenerateSourceTags = async () => {
+    const sourceTitle = isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle;
+    const sourceContent = isTeluguToEnglish ? formData.teluguContent : formData.englishContent;
+
+    if (!sourceTitle && !sourceContent) {
+      setMessage(`Please enter ${isTeluguToEnglish ? 'Telugu' : 'English'} title or content first`);
       return;
     }
 
-    setLoading((prev) => ({ ...prev, generateEnglishTags: true }));
+    setLoading((prev) => ({ ...prev, generateSourceTags: true }));
     setMessage("");
 
     try {
-      const response = await newsAPI.generateEnglishTags({
-        englishTitle: formData.englishTitle,
-        englishContent: formData.englishContent,
+      const endpoint = isTeluguToEnglish 
+        ? newsAPI.generateTeluguTags 
+        : newsAPI.generateEnglishTags;
+
+      const response = await endpoint({
+        [isTeluguToEnglish ? 'teluguTitle' : 'englishTitle']: sourceTitle,
+        [isTeluguToEnglish ? 'teluguContent' : 'englishContent']: sourceContent,
       });
 
+      const tagField = isTeluguToEnglish ? 'teluguTags' : 'englishTags';
+      
       setFormData((prev) => ({
         ...prev,
-        englishTags: response.data.englishTags || [],
+        [tagField]: response.data[tagField] || [],
       }));
 
       setMessage(
         `Generated ${
-          response.data.englishTags?.length || 0
-        } relevant English tags from your content!`
+          response.data[tagField]?.length || 0
+        } relevant ${isTeluguToEnglish ? 'Telugu' : 'English'} tags from your content!`
       );
     } catch (error) {
       setMessage(
-        "Failed to generate English tags: " +
+        `Failed to generate ${isTeluguToEnglish ? 'Telugu' : 'English'} tags: ` +
           (error.response?.data?.error || error.message)
       );
     } finally {
-      setLoading((prev) => ({ ...prev, generateEnglishTags: false }));
+      setLoading((prev) => ({ ...prev, generateSourceTags: false }));
     }
   };
 
   const handleAutoTranslate = async () => {
-    if (!formData.englishTitle || !formData.englishContent) {
-      setMessage("Please enter English title and content first");
+    const sourceTitle = isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle;
+    const sourceContent = isTeluguToEnglish ? formData.teluguContent : formData.englishContent;
+    const sourceTags = isTeluguToEnglish ? formData.teluguTags : formData.englishTags;
+
+    if (!sourceTitle || !sourceContent) {
+      setMessage(`Please enter ${isTeluguToEnglish ? 'Telugu' : 'English'} title and content first`);
       return;
     }
 
@@ -419,22 +477,36 @@ const AdminDashboard = () => {
     setMessage("");
 
     try {
-      const response = await newsAPI.autoTranslate({
-        englishTitle: formData.englishTitle,
-        englishContent: formData.englishContent,
-        englishTags: formData.englishTags,
-      });
+      const endpoint = isTeluguToEnglish 
+        ? newsAPI.autoTranslateTeluguToEnglish 
+        : newsAPI.autoTranslate;
+
+      const requestData = isTeluguToEnglish
+        ? {
+            teluguTitle: sourceTitle,
+            teluguContent: sourceContent,
+            teluguTags: sourceTags,
+          }
+        : {
+            englishTitle: sourceTitle,
+            englishContent: sourceContent,
+            englishTags: sourceTags,
+          };
+
+      const response = await endpoint(requestData);
 
       setFormData((prev) => ({
         ...prev,
-        teluguTitle: response.data.teluguTitle,
-        teluguContent: response.data.teluguContent,
-        teluguTags: response.data.teluguTags || [],
-        englishTags: response.data.englishTags || prev.englishTags,
+        englishTitle: isTeluguToEnglish ? response.data.englishTitle : prev.englishTitle,
+        englishContent: isTeluguToEnglish ? response.data.englishContent : prev.englishContent,
+        englishTags: isTeluguToEnglish ? response.data.englishTags || [] : response.data.englishTags || prev.englishTags,
+        teluguTitle: !isTeluguToEnglish ? response.data.teluguTitle : prev.teluguTitle,
+        teluguContent: !isTeluguToEnglish ? response.data.teluguContent : prev.teluguContent,
+        teluguTags: !isTeluguToEnglish ? response.data.teluguTags || [] : response.data.teluguTags || prev.teluguTags,
       }));
 
       setMessage(
-        "Telugu translation generated successfully! Tags have been optimized for both languages."
+        `${isTeluguToEnglish ? 'English' : 'Telugu'} translation generated successfully! Tags have been optimized for both languages.`
       );
     } catch (error) {
       setMessage(
@@ -494,6 +566,9 @@ const AdminDashboard = () => {
     setFormData((prev) => ({ ...prev, teluguTags: [] }));
   };
 
+  const getSourceLanguage = () => isTeluguToEnglish ? "Telugu" : "English";
+  const getTargetLanguage = () => isTeluguToEnglish ? "English" : "Telugu";
+
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
       <div className="max-w-6xl mx-auto px-2 sm:px-4">
@@ -504,26 +579,32 @@ const AdminDashboard = () => {
               Bilingual News Publisher
             </h1>
             <p className="text-sm sm:text-base text-gray-600">
-              AI-powered translation and smart tag generation
+              AI-powered bidirectional translation and smart tag generation
             </p>
           </div>
           <MusicPlayer />
         </div>
 
+        {/* Translation Toggle */}
+        <TranslationToggle 
+          isTeluguToEnglish={isTeluguToEnglish}
+          onToggle={setIsTeluguToEnglish}
+        />
+
         <form
           onSubmit={handleSubmit}
           className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8"
         >
-          {/* English Section */}
+          {/* Source Language Section */}
           <div className="mb-6 sm:mb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-700">
-                English Content
+                {getSourceLanguage()} Content {isTeluguToEnglish && "(Source)"}
               </h2>
-              {formData.englishTags.length > 0 && (
+              {(!isTeluguToEnglish ? formData.englishTags : formData.teluguTags).length > 0 && (
                 <button
                   type="button"
-                  onClick={clearAllEnglishTags}
+                  onClick={isTeluguToEnglish ? clearAllTeluguTags : clearAllEnglishTags}
                   className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium"
                 >
                   Clear All Tags
@@ -533,47 +614,50 @@ const AdminDashboard = () => {
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                English Title *
+                {getSourceLanguage()} Title *
               </label>
               <EnhancedInput
-                name="englishTitle"
-                value={formData.englishTitle}
+                name={isTeluguToEnglish ? "teluguTitle" : "englishTitle"}
+                value={isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle}
                 onChange={handleInputChange}
-                placeholder="Enter news title in English"
+                placeholder={`Enter news title in ${getSourceLanguage()}`}
                 required
+                dir={isTeluguToEnglish ? "ltr" : "ltr"}
               />
             </div>
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                English Content *
+                {getSourceLanguage()} Content *
               </label>
               <EnhancedTextArea
-                name="englishContent"
-                value={formData.englishContent}
+                name={isTeluguToEnglish ? "teluguContent" : "englishContent"}
+                value={isTeluguToEnglish ? formData.teluguContent : formData.englishContent}
                 onChange={handleInputChange}
-                placeholder="Enter news content in English"
+                placeholder={`Enter news content in ${getSourceLanguage()}`}
                 required
+                dir={isTeluguToEnglish ? "ltr" : "ltr"}
               />
             </div>
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                English Tags
+                {getSourceLanguage()} Tags
                 <span className="text-xs text-gray-500 ml-2">
                   Press Enter, comma, or click Add Tag
                 </span>
               </label>
               <TagInput
-                tags={formData.englishTags}
-                onAddTag={handleAddEnglishTag}
-                onRemoveTag={handleRemoveEnglishTag}
-                onAutoGenerate={handleGenerateEnglishTags}
+                tags={isTeluguToEnglish ? formData.teluguTags : formData.englishTags}
+                onAddTag={isTeluguToEnglish ? handleAddTeluguTag : handleAddEnglishTag}
+                onRemoveTag={isTeluguToEnglish ? handleRemoveTeluguTag : handleRemoveEnglishTag}
+                onAutoGenerate={handleGenerateSourceTags}
                 showAutoGenerate={true}
-                placeholder="Add custom English tags or click Auto Generate"
-                disabled={loading.generateEnglishTags}
+                placeholder={`Add custom ${getSourceLanguage()} tags or click Auto Generate`}
+                disabled={loading.generateSourceTags}
+                inputDir={isTeluguToEnglish ? "ltr" : "ltr"}
               />
-              {loading.generateEnglishTags && (
+              {loading.generateSourceTags && (
                 <div className="flex items-center gap-2 text-purple-600 text-xs sm:text-sm mt-2">
                   <svg
                     className="animate-spin h-3 w-3 sm:h-4 sm:w-4"
@@ -595,7 +679,7 @@ const AdminDashboard = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Generating relevant English tags from your content...
+                  Generating relevant {getSourceLanguage().toLowerCase()} tags from your content...
                 </div>
               )}
             </div>
@@ -608,8 +692,8 @@ const AdminDashboard = () => {
               onClick={handleAutoTranslate}
               disabled={
                 loading.autoTranslate ||
-                !formData.englishTitle ||
-                !formData.englishContent
+                !(isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle) ||
+                !(isTeluguToEnglish ? formData.teluguContent : formData.englishContent)
               }
               className="w-full bg-green-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center text-base sm:text-lg font-semibold"
             >
@@ -635,27 +719,27 @@ const AdminDashboard = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Translating to Telugu and Optimizing Tags...
+                  Translating to {getTargetLanguage()} and Optimizing Tags...
                 </>
               ) : (
-                "🚀 Auto Translate to Telugu"
+                `🚀 Auto Translate to ${getTargetLanguage()}`
               )}
             </button>
             <p className="text-xs sm:text-sm text-gray-600 mt-2 text-center">
-              This will translate content to Telugu and generate matching Telugu tags
+              This will translate content to {getTargetLanguage()} and generate matching tags
             </p>
           </div>
 
-          {/* Telugu Section */}
+          {/* Target Language Section */}
           <div className="mb-6 sm:mb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-700">
-                Telugu Content
+                {getTargetLanguage()} Content {!isTeluguToEnglish && "(Target)"}
               </h2>
-              {formData.teluguTags.length > 0 && (
+              {(!isTeluguToEnglish ? formData.teluguTags : formData.englishTags).length > 0 && (
                 <button
                   type="button"
-                  onClick={clearAllTeluguTags}
+                  onClick={!isTeluguToEnglish ? clearAllTeluguTags : clearAllEnglishTags}
                   className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium"
                 >
                   Clear All Tags
@@ -665,45 +749,45 @@ const AdminDashboard = () => {
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                Telugu Title *
+                {getTargetLanguage()} Title *
               </label>
               <EnhancedInput
-                name="teluguTitle"
-                value={formData.teluguTitle}
+                name={!isTeluguToEnglish ? "teluguTitle" : "englishTitle"}
+                value={!isTeluguToEnglish ? formData.teluguTitle : formData.englishTitle}
                 onChange={handleInputChange}
                 dir="ltr"
-                placeholder="Telugu title will auto-fill after translation"
+                placeholder={`${getTargetLanguage()} title will auto-fill after translation`}
                 required
               />
             </div>
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                Telugu Content *
+                {getTargetLanguage()} Content *
               </label>
               <EnhancedTextArea
-                name="teluguContent"
-                value={formData.teluguContent}
+                name={!isTeluguToEnglish ? "teluguContent" : "englishContent"}
+                value={!isTeluguToEnglish ? formData.teluguContent : formData.englishContent}
                 onChange={handleInputChange}
                 dir="ltr"
-                placeholder="Telugu content will auto-fill after translation"
+                placeholder={`${getTargetLanguage()} content will auto-fill after translation`}
                 required
               />
             </div>
 
             <div className="mb-4">
               <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2">
-                Telugu Tags
+                {getTargetLanguage()} Tags
                 <span className="text-xs text-gray-500 ml-2">
                   Press Enter, comma, or click Add Tag
                 </span>
               </label>
               <TagInput
-                tags={formData.teluguTags}
-                onAddTag={handleAddTeluguTag}
-                onRemoveTag={handleRemoveTeluguTag}
+                tags={!isTeluguToEnglish ? formData.teluguTags : formData.englishTags}
+                onAddTag={!isTeluguToEnglish ? handleAddTeluguTag : handleAddEnglishTag}
+                onRemoveTag={!isTeluguToEnglish ? handleRemoveTeluguTag : handleRemoveEnglishTag}
                 inputDir="ltr"
-                placeholder="Add custom Telugu tags"
+                placeholder={`Add custom ${getTargetLanguage()} tags`}
               />
             </div>
           </div>
@@ -718,7 +802,7 @@ const AdminDashboard = () => {
             >
               👁️ Preview Article
             </button>
-            {/* <button
+            <button
               type="submit"
               disabled={
                 loading.submit ||
@@ -728,7 +812,7 @@ const AdminDashboard = () => {
               className="w-full sm:flex-1 bg-blue-600 text-white px-4 sm:px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-lg font-semibold"
             >
               {loading.submit ? "📤 Publishing..." : "📰 Publish News Article"}
-            </button> */}
+            </button>
           </div>
 
           {message && (

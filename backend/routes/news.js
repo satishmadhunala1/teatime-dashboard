@@ -3,7 +3,6 @@ const router = express.Router();
 const News = require('../models/News');
 const geminiService = require('../services/geminiService');
 
-
 // Generate English tags only
 router.post('/generate-english-tags', async (req, res) => {
   try {
@@ -60,20 +59,63 @@ Examples for reference:
   }
 });
 
-// Helper function for fallback tag generation
-function generateFallbackTags(title, content) {
-  const text = (title + ' ' + content).toLowerCase();
-  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were']);
-  
-  const words = text
-    .split(/\W+/)
-    .filter(word => word.length > 3 && !commonWords.has(word))
-    .slice(0, 10);
-  
-  return [...new Set(words)].slice(0, 5);
+// Generate Telugu tags only
+router.post('/generate-telugu-tags', async (req, res) => {
+  try {
+    const { teluguTitle, teluguContent } = req.body;
+
+    if (!teluguTitle && !teluguContent) {
+      return res.status(400).json({
+        error: 'Telugu title or content is required to generate tags'
+      });
+    }
+
+    const prompt = `
+Generate 5-7 highly relevant and specific Telugu tags for this news content. Focus on the main topics, entities, and themes.
+
+CONTENT:
+Title: ${teluguTitle || 'Not provided'}
+Content: ${teluguContent || 'Not provided'}
+
+REQUIREMENTS:
+- Generate 5-7 relevant Telugu tags
+- Tags should be specific and meaningful in Telugu
+- Include entity names, topics, locations if mentioned
+- Use proper Telugu script and spelling
+- Make tags SEO-friendly and descriptive
+- Avoid generic tags unless necessary
+
+OUTPUT FORMAT (JSON only):
+{
+  "teluguTags": ["ట్యాగ్1", "ట్యాగ్2", "ట్యాగ్3", "ట్యాగ్4", "ట్యాగ్5"]
 }
 
-// Auto-translate endpoint (updated)
+Examples for reference:
+- If content about AI technology: ["కృత్రిమ-మేధస్సు", "యంత్ర-అభ్యసన", "సాంకేతిక-నవీకరణ", "ఏఐ-పరిశోధన", "భవిష్యత్-టెక్నాలజీ"]
+- If content about politics: ["ఎన్నికలు-2024", "రాజకీయ-వార్తలు", "ప్రభుత్వ-విధానం", "ప్రజాస్వామ్య-ప్రక్రియ", "పబ్లిక్-ఆపినియన్"]
+`;
+
+    const result = await geminiService.generateContentDirect(prompt);
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const parsedData = JSON.parse(jsonMatch[0]);
+      res.json(parsedData);
+    } else {
+      // Fallback: Generate basic Telugu tags
+      const fallbackTags = ["సమాచారం", "వార్త", "అప్డేట్", "తాజా", "సంగతులు"];
+      res.json({ teluguTags: fallbackTags });
+    }
+  } catch (error) {
+    console.error('Telugu tag generation error:', error);
+    
+    // Fallback tag generation
+    const fallbackTags = ["సమాచారం", "వార్త", "అప్డేట్", "తాజా", "సంగతులు"];
+    res.json({ teluguTags: fallbackTags });
+  }
+});
+
+// Auto-translate English to Telugu
 router.post('/auto-translate', async (req, res) => {
   try {
     const { englishTitle, englishContent, englishTags } = req.body;
@@ -100,28 +142,26 @@ router.post('/auto-translate', async (req, res) => {
   }
 });
 
-// Auto-translate endpoint
-
-
-router.post('/auto-translate', async (req, res) => {
+// Auto-translate Telugu to English
+router.post('/auto-translate-telugu-to-english', async (req, res) => {
   try {
-    const { englishTitle, englishContent, englishTags } = req.body;
+    const { teluguTitle, teluguContent, teluguTags } = req.body;
 
-    if (!englishTitle || !englishContent) {
+    if (!teluguTitle || !teluguContent) {
       return res.status(400).json({
-        error: 'English title and content are required'
+        error: 'Telugu title and content are required'
       });
     }
 
-    const translationResult = await geminiService.translateAndCorrect({
-      title: englishTitle,
-      content: englishContent,
-      tags: englishTags
+    const translationResult = await geminiService.translateTeluguToEnglish({
+      title: teluguTitle,
+      content: teluguContent,
+      tags: teluguTags
     });
 
     res.json(translationResult);
   } catch (error) {
-    console.error('Translation error:', error);
+    console.error('Telugu to English translation error:', error);
     res.status(500).json({
       error: 'Translation service unavailable',
       details: error.message
@@ -179,5 +219,18 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Helper function for fallback tag generation
+function generateFallbackTags(title, content) {
+  const text = (title + ' ' + content).toLowerCase();
+  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were']);
+  
+  const words = text
+    .split(/\W+/)
+    .filter(word => word.length > 3 && !commonWords.has(word))
+    .slice(0, 10);
+  
+  return [...new Set(words)].slice(0, 5);
+}
 
 module.exports = router;

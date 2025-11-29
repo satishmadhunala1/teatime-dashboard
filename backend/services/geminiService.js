@@ -323,6 +323,179 @@ OUTPUT FORMAT (JSON only):
       };
     }
   }
+
+  // NEW METHOD: Telugu to English Translation
+  async translateTeluguToEnglish({ title, content, tags = [] }) {
+    this.log('info', 'Starting Telugu to English translation', { 
+      titleLength: title.length, 
+      contentLength: content.length, 
+      tags: tags.length 
+    });
+    
+    const prompt = `
+CRITICAL MISSION: You are an English Linguistics Professor with 30 years of experience in translation and journalism. Your translation from Telugu to English must be ABSOLUTELY PERFECT without a single error.
+
+TELUGU INPUT TO TRANSLATE:
+TITLE: ${title}
+CONTENT: ${content}
+TAGS: ${tags.length ? tags.join(', ') : 'None provided'}
+
+MANDATORY QUALITY CONTROL PROCESS - VERIFY 5 TIMES:
+
+VERIFICATION 1 - GRAMMAR CHECK:
+✓ Every English word must follow proper grammar rules
+✓ Check verb tenses, noun forms, and sentence structure
+✓ Ensure proper syntax and punctuation
+
+VERIFICATION 2 - SPELLING ACCURACY:
+✓ Every English word must be perfectly spelled
+✓ Verify all technical terms and proper nouns
+✓ Check for common spelling mistakes and eliminate them
+
+VERIFICATION 3 - CULTURAL APPROPRIATENESS:
+✓ Translation must sound like native English journalism
+✓ Use proper English news terminology and phrases
+✓ Adapt cultural references appropriately for English readers
+
+VERIFICATION 4 - MEANING PRESERVATION:
+✓ Maintain exact original meaning while making it natural English
+✓ No literal translation - only contextual adaptation
+✓ Preserve all facts, numbers, and important details
+
+VERIFICATION 5 - FLUENCY CHECK:
+✓ Read entire translation aloud mentally
+✓ Ensure smooth flow like original English news content
+✓ Verify paragraph structure and readability
+
+TRANSLATION REQUIREMENTS:
+1. Title Translation: Must be compelling and accurate
+2. Content Translation: Must be flawless, natural English
+3. Tags: Generate 3-5 highly relevant Telugu tags
+4. English Tags: Generate matching English tags that are culturally appropriate
+
+ENGLISH LANGUAGE EXCELLENCE STANDARDS:
+- Use Standard English
+- Follow proper journalistic style
+- Maintain news journalism standards
+- Ensure readability for all English readers
+
+OUTPUT FORMAT (STRICT JSON ONLY - NO DEVIATIONS):
+{
+  "englishTitle": "Perfect English title here",
+  "englishContent": "Completely flawless English content here. Every word, every sentence must be absolutely correct.",
+  "teluguTags": ["ఖచ్చితమైన-ట్యాగ్1", "సరైన-ట్యాగ్2", "సందర్భోచిత-ట్యాగ్3"],
+  "englishTags": ["precise-tag1", "accurate-tag2", "relevant-tag3"]
+}
+
+EXAMPLES OF PERFECT TRANSLATION:
+
+Telugu: "ప్రధానమంత్రి మోదీ నేడు కొత్త ఆర్థిక సంస్కరణలను ప్రకటించారు"
+Perfect English: "Prime Minister Modi announced new economic reforms today"
+
+Telugu: "శాస్త్రవేత్తలు నివసించడానికి అనుకూలమైన ప్రదేశంలో కొత్త గ్రహాన్ని కనుగొన్నారు"
+Perfect English: "Scientists discovered new planet in habitable zone"
+
+Telugu: "అనుకూలమైన వాతావరణంతో స్టాక్ మార్కెట్ అన్ని కాలాల్లోనూ అత్యధిక స్థాయిని తాకింది"
+Perfect English: "Stock market reaches all-time high amid positive sentiment"
+
+FINAL QUALITY ASSURANCE:
+Before submitting, perform these 5 verification checks one final time. Every character must be perfect. No compromises on quality.
+
+IMPORTANT: Return ONLY the JSON object. No additional text, no explanations, no apologies.
+`;
+
+    this.log('info', 'Telugu to English prompt generated', { promptLength: prompt.length });
+    
+    try {
+      const text = await this.makeRequestWithRetry(prompt);
+      this.log('info', 'Raw Telugu to English API response received', { 
+        responsePreview: text.substring(0, 200) + '...' 
+      });
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        this.log('error', 'No JSON found in Telugu to English response', { 
+          fullTextLength: text.length, 
+          responsePreview: text 
+        });
+        throw new Error('Invalid JSON response format from Gemini API');
+      }
+      
+      const result = JSON.parse(jsonMatch[0]);
+      this.log('info', 'Telugu to English JSON parsed successfully', { 
+        hasEnglishTitle: !!result.englishTitle, 
+        hasEnglishContent: !!result.englishContent 
+      });
+      
+      this.validateEnglishTranslation(result);
+      
+      this.log('info', 'Telugu to English translation complete', { 
+        englishLength: result.englishContent?.length 
+      });
+      return result;
+    } catch (error) {
+      this.log('error', 'Telugu to English translation failed after retries', { 
+        error: error.message 
+      });
+      const fallback = this.getFallbackTranslationTeluguToEnglish(title, content, tags);
+      this.log('info', 'Using Telugu to English fallback translation');
+      return fallback;
+    }
+  }
+
+  // Add validation for English content
+  validateEnglishTranslation(translation) {
+    const { englishTitle, englishContent, englishTags } = translation;
+    
+    // Basic English validation
+    const englishRegex = /[a-zA-Z]/;
+    
+    if (!englishRegex.test(englishTitle || '')) {
+      this.log('warn', 'English title lacks English characters - possible incomplete translation');
+    }
+    
+    if (!englishRegex.test(englishContent || '')) {
+      this.log('warn', 'English content lacks English characters - possible incomplete translation');
+    }
+    
+    // Check for common English errors
+    this.checkCommonEnglishErrors(englishTitle || '', 'Title');
+    this.checkCommonEnglishErrors(englishContent || '', 'Content');
+    this.checkCommonEnglishErrors((englishTags || []).join(' '), 'Tags');
+  }
+
+  // Check for common English translation errors
+  checkCommonEnglishErrors(text, field) {
+    const commonErrors = [
+      { pattern: /[\u0C00-\u0C7F]/, message: 'Telugu characters in English text' },
+      { pattern: /\?\?\?/, message: 'Untranslated sections (??? placeholders)' },
+      { pattern: /\[.*\]/, message: 'Bracketed notes/unfinished parts' },
+      { pattern: /fallback/i, message: 'Fallback text detected in output' }
+    ];
+    
+    commonErrors.forEach(({ pattern, message }) => {
+      if (pattern.test(text)) {
+        this.log('warn', `Quality issue in ${field}: ${message}`, { 
+          sample: text.substring(0, 50) 
+        });
+      }
+    });
+  }
+
+  // Fallback translation for Telugu to English
+  getFallbackTranslationTeluguToEnglish(title, content, tags) {
+    this.log('warn', 'Telugu to English fallback activated - API unavailable or failed');
+    const result = {
+      englishTitle: `[Translation temporarily unavailable] ${title.substring(0, 50)}...`,
+      englishContent: `[Translation temporarily unavailable] ${content.substring(0, 100)}...`,
+      teluguTags: tags.length ? tags.slice(0, 3) : ["సమాచారం", "వార్త", "అప్డేట్"],
+      englishTags: this.generateFallbackTags(title),
+      _fallback: true,
+      _message: "Translation service temporarily unavailable. Using fallback."
+    };
+    this.log('info', 'Telugu to English fallback result prepared');
+    return result;
+  }
 }
 
 module.exports = new GeminiService();

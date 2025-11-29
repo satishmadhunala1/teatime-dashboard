@@ -15,6 +15,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/news', require('./routes/news'));
 
 
+app.get('/', (req, res) => {
+  res.send('Welcome to the Bilingual News Auto-Fetcher API');
+});
+
+
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
