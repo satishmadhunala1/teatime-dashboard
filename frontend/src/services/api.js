@@ -3,7 +3,7 @@ import axios from 'axios';
 
 
 
-const API_BASE_URL = 'https://ttcheck.onrender.com/api'
+const API_BASE_URL = 'https://teatime-dashboard.onrender.com/api'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
