@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const GEMINI_API_KEY = "AIzaSyB4eiWP4fvJTp35w7EZhMQsrlL1wcGvGkg"
+const GEMINI_API_KEY = "AIzaSyCXyPIXHqTUX6ASqMeYYDImY8sauduwrPY"
 
 class GeminiService {
   constructor() {
